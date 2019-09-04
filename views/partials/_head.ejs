@@ -32,16 +32,5 @@
   <header class='header'>
     <h2>DevQUOTZ</h2>
 
-    <div>
-      <% if (currentUser) { %>
-      <div class="welcome-msg">
-        <p>Welcome <%= currentUser.name %></p>
-        <form method="post" action="/login?_method=DELETE" >
-          <input type='submit' value='logout'>
-        </form>
-      </div>
-      <% } else { %>
-        <a href='/login'>Login</a> | <a href='/register'>Register</a>
-      <% } %>
-    </div>
+
   </header>
