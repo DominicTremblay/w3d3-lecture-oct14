@@ -1,8 +1,12 @@
 const express = require('express');
 const port = process.env.PORT || 3001;
 const bodyParser = require('body-parser');
-const uuid = require('uuid/v4');
+const uuid = require('uuid/v4'); // uuid generates a random string
+
+const cookieParser = require('cookie-parser');
+
 const app = express();
+app.use(cookieParser());
 
 // Serve static assets(css, images, etc) from the public folder
 app.use(express.static('public'));
@@ -85,6 +89,35 @@ const quoteList = () => {
   return quotes;
 };
 
+// We want to check if that email exists in users db
+const findUser = email => {
+  // itetrate through the users object
+  for (let userId in users) {
+    const currentUser = users[userId];
+
+    if (currentUser.email === email) {
+      return currentUser;
+    }
+  }
+
+  return false;
+};
+
+// Adding the user to the users DB
+const addUser = (name, email, password) => {
+  const id = uuid();
+
+  const newUser = {
+    id,
+    name,
+    email,
+    password,
+  };
+
+  users[id] = newUser;
+
+  return id;
+};
 // Dev routes so we see the users db
 app.get('/db/users', (req, res) => {
   res.json(users);
@@ -108,6 +141,39 @@ app.get('/quotes', (req, res) => {
   const quotes = Object.values(quoteList());
 
   res.render('quotes', { quotes });
+});
+
+app.get('/register', (req, res) => {
+  res.render('register');
+});
+
+app.post('/register', (req, res) => {
+  // extract the info from the form
+
+  // const name = req.body.name;
+  // const email = req.body.email;
+  // const password = req.body.password;
+
+  // es6 desctructuring doing the above 3 statements
+  const { name, email, password } = req.body;
+
+  // check if everything is valid
+
+  const user = findUser(email);
+
+  // check if the user already exists
+
+  if (user) {
+    res.status(401).send('That user already exist!');
+    return;
+  }
+
+  const userId = addUser(name, email, password);
+
+  // set a cookie to log in the user
+  res.cookie('user_id', userId);
+
+  res.redirect('/db/users'); //'/quotes' (/db/users)
 });
 
 app.listen(port, () => console.log(`Server listening on port ${port}`));
