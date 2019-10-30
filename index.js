@@ -1,15 +1,27 @@
 const express = require('express');
 const port = process.env.PORT || 3001;
+// const cookieParser = require('cookie-parser');
+const cookieSession = require('cookie-session');
 const bodyParser = require('body-parser');
 const uuid = require('uuid/v4'); // uuid generates a random string
-
-const cookieParser = require('cookie-parser');
+const bcrypt = require('bcryptjs');
+const salt = bcrypt.genSaltSync(10);
 
 const app = express();
-app.use(cookieParser());
+// app.use(cookieParser());
 
 // Serve static assets(css, images, etc) from the public folder
 app.use(express.static('public'));
+
+app.use(
+  cookieSession({
+    name: 'session',
+    keys: [
+      '7de13381-61b5-47aa-9c74-5ede1ceac390',
+      '8dddb6db-4d8d-4571-a836-04fa8d5a9186',
+    ],
+  }),
+);
 
 // Set the view engine to ejs. Default is pug
 app.set('view engine', 'ejs');
@@ -111,13 +123,35 @@ const addUser = (name, email, password) => {
     id,
     name,
     email,
-    password,
+    password: bcrypt.hashSync(password, salt),
   };
 
   users[id] = newUser;
 
   return id;
 };
+
+const validationErrors = (email, password) => {
+  // validate format of email and passord
+
+  if (password.length < 6) {
+    return 'Please provide a password of at least 6 digits';
+  }
+
+  return false;
+};
+
+const authenticateUser = (email, password) => {
+  // retrieve the user in the users Db
+  const user = findUser(email);
+  // if there is a user, compare passwords
+  if (user && bcrypt.compareSync(password, user.password)) {
+    return user;
+  } else {
+    return false;
+  }
+};
+
 // Dev routes so we see the users db
 app.get('/db/users', (req, res) => {
   res.json(users);
@@ -139,12 +173,15 @@ app.get('/', (req, res) => res.redirect('/quotes'));
 // Render the page to display the list of quotes
 app.get('/quotes', (req, res) => {
   const quotes = Object.values(quoteList());
+  const templateVars = { quotes, currentUser: users[req.session.user_id] };
 
-  res.render('quotes', { quotes });
+  res.render('quotes', templateVars);
 });
 
 app.get('/register', (req, res) => {
-  res.render('register');
+  const templateVars = { currentUser: null };
+
+  res.render('register', templateVars);
 });
 
 app.post('/register', (req, res) => {
@@ -171,9 +208,38 @@ app.post('/register', (req, res) => {
   const userId = addUser(name, email, password);
 
   // set a cookie to log in the user
-  res.cookie('user_id', userId);
+  // res.cookie('user_id', userId);
 
-  res.redirect('/db/users'); //'/quotes' (/db/users)
+  req.session.user_id = userId;
+
+  // res.redirect('/db/users'); // db/users for testing
+
+  res.redirect('/quotes');
+});
+
+app.get('/login', (req, res) => {
+  const templateVars = { currentUser: null };
+  res.render('login', templateVars);
+});
+
+app.post('/login', (req, res) => {
+  // extract the email and password from the request
+  const { email, password } = req.body;
+
+  // validate the inputs on the form
+  // if (!validationErrors(email, password)) {
+  //authenticate the user
+  const user = authenticateUser(email, password);
+
+  if (user) {
+    // log the user in by setting the cookie
+    req.session.user_id = user.id;
+    // redirect to quotes
+    res.redirect('/quotes');
+  } else {
+    res.status(401).send('Wrong Credentials');
+  }
+  // }
 });
 
 app.listen(port, () => console.log(`Server listening on port ${port}`));
